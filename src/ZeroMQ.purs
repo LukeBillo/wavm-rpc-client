@@ -7,6 +7,7 @@ import Control.Monad.Reader (class MonadAsk, ReaderT, ask, runReaderT)
 import Data.Function.Uncurried (Fn1, Fn2, runFn1, runFn2)
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
+import TypeConversion (WasmType, JsPrimitive, parseResult, convertWasmType)
 
 -- Handling foreign imports
 
@@ -55,6 +56,7 @@ send e (Remote r) = runReaderT r e
 data Endpoint = Endpoint {
     socket :: Socket,
     async :: Socket -> String -> Effect Unit,
+    sync :: Socket -> String -> Effect String
 }
 
 runAsyncCmd :: Command -> Remote Unit
@@ -63,10 +65,19 @@ runAsyncCmd c = Remote $ do
     liftEffect $ e.async e.socket (show c)
     pure unit
 
+runSyncCmd :: Command -> Remote JsPrimitive
+runSyncCmd c = Remote $ do
+    (Endpoint e) <- ask
+    r <- liftEffect $ e.sync e.socket (show c)
+    pure $ convertWasmType (parseResult r)
+
 -- Command conversions
 
 init :: String -> Remote Unit
 init s = runAsyncCmd $ Init s
+
+execute :: String -> Remote JsPrimitive
+execute s = runSyncCmd $ Execute s
 
 void :: String -> Remote Unit
 void s = runAsyncCmd $ Void s
@@ -77,5 +88,6 @@ newtype Remote a = Remote (ReaderT Endpoint Effect a)
 derive newtype instance bindRemote ∷ Bind Remote
 derive newtype instance monadRemote :: Monad Remote
 derive newtype instance applicativeRemote ∷ Applicative Remote
+derive newtype instance applyRemote :: Apply Remote
 derive newtype instance monadAskRemote :: MonadAsk Endpoint Remote
 derive newtype instance monadEffectRemote :: MonadEffect Remote

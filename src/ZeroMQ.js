@@ -32,30 +32,31 @@ const createZeroMqServer = function(port) {
 
 function sendAsync(socket, message) {
   return function() {
-    console.log(message);
     socket.send(message);
   }
 }
 
 function sendSync(socket, message) {
-  const reply = new Promise(function(resolve, reject) {
-    const rejectTimer = setTimeout(function() {
-      reject(new Error('request timed out.'));
-    }, this.timeout);
-
-    const clearTimer = function() {
-      clearTimeout(rejectTimer);
-    } 
-
-    this.socket.once('message', function(message) {
-      clearTimer();
-      resolve(message);
+  return function() {
+    return new Promise(function(resolve, reject) {
+      const rejectTimer = setTimeout(function() {
+        reject(new Error('request timed out.'));
+      }, this.timeout);
+  
+      const clearTimer = function() {
+        clearTimeout(rejectTimer);
+      } 
+  
+      this.socket.once('message', function(message) {
+        clearTimer();
+        resolve(message);
+      });
+  
+      this.socket.send(message);
+    }).then(function(res) {
+      return res;
     });
-
-    this.socket.send(message);
-  }).then(function(res) {
-    return res;
-  });
+  }
 }
 
 exports.createZeroMqServer = createZeroMqServer;
