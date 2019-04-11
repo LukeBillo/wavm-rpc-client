@@ -4,27 +4,33 @@ import Prelude
 
 import Command (Command(..))
 import Control.Monad.Reader (class MonadAsk, ReaderT, ask, runReaderT)
-import Data.Function.Uncurried (Fn1, Fn2, runFn1, runFn2)
+import Control.Promise (Promise, toAff)
+import Data.Function.Uncurried (Fn2, runFn2)
 import Effect (Effect)
+import Effect.Aff (Aff)
+import Effect.Aff.Class (liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
-import TypeConversion (WasmType, JsPrimitive, parseResult, convertWasmType)
+import TypeConversion (JsPrimitive, convertWasmType, parseResult)
 
 -- Handling foreign imports
 
-foreign import data Socket :: Type
+foreign import data AsyncSocket :: Type
+foreign import data SyncSocket :: Type
 
-foreign import createZeroMqServer :: Fn1 Int Socket
-foreign import sendAsync :: Fn2 Socket String (Effect Unit)
-foreign import sendSync :: Fn2 Socket String (Effect String)
+type ServerSockets = { asyncSocket :: AsyncSocket, syncSocket :: SyncSocket }
+
+foreign import createZeroMqServer :: Fn2 Int Int ServerSockets
+foreign import sendAsync :: Fn2 AsyncSocket String (Effect (Promise Unit))
+foreign import sendSync :: Fn2 SyncSocket String (Effect (Promise String))
 
 {- -------------- -}
 {- Server startup -}
 {- -------------- -}
 
-createZeroMqServerCurried :: Int -> Socket
-createZeroMqServerCurried = runFn1 createZeroMqServer
+createZeroMqServerCurried :: Int -> Int -> ServerSockets
+createZeroMqServerCurried = runFn2 createZeroMqServer
 
-createRpcServer :: Int -> Socket
+createRpcServer :: Int -> Int ->  ServerSockets
 createRpcServer = createZeroMqServerCurried
 
 {- -------------- -}
@@ -32,21 +38,21 @@ createRpcServer = createZeroMqServerCurried
 {- -------------- -}
 
 -- Async
-sendAsyncCurried :: Socket -> String -> Effect Unit
+sendAsyncCurried :: AsyncSocket -> String -> Effect (Promise Unit)
 sendAsyncCurried = runFn2 sendAsync
 
-sendRemoteAsync :: Socket -> String -> Effect Unit
-sendRemoteAsync sock s = sendAsyncCurried sock s
+sendRemoteAsync :: AsyncSocket -> String -> Aff Unit
+sendRemoteAsync sock s = liftEffect (sendAsyncCurried sock s) >>= toAff
 
 -- Sync
-sendSyncCurried :: Socket -> String -> Effect String
+sendSyncCurried :: SyncSocket -> String -> Effect (Promise String)
 sendSyncCurried = runFn2 sendSync
 
-sendRemoteSync :: Socket -> String -> Effect String
-sendRemoteSync sock s = sendSyncCurried sock s
+sendRemoteSync :: SyncSocket -> String ->  Aff String
+sendRemoteSync sock s = liftEffect (sendSyncCurried sock s) >>= toAff
 
 -- Generic
-send :: forall a. Endpoint -> Remote a -> Effect a
+send :: forall a. Endpoint -> Remote a -> Aff a
 send e (Remote r) = runReaderT r e
 
 {- --------------- -}
@@ -54,21 +60,21 @@ send e (Remote r) = runReaderT r e
 {- --------------- -}
 
 data Endpoint = Endpoint {
-    socket :: Socket,
-    async :: Socket -> String -> Effect Unit,
-    sync :: Socket -> String -> Effect String
+    sockets :: ServerSockets,
+    async :: AsyncSocket -> String -> Aff Unit,
+    sync :: SyncSocket -> String -> Aff String
 }
 
 runAsyncCmd :: Command -> Remote Unit
 runAsyncCmd c = Remote $ do 
     (Endpoint e) <- ask
-    liftEffect $ e.async e.socket (show c)
+    liftAff $ e.async e.sockets.asyncSocket (show c)
     pure unit
 
 runSyncCmd :: Command -> Remote JsPrimitive
 runSyncCmd c = Remote $ do
     (Endpoint e) <- ask
-    r <- liftEffect $ e.sync e.socket (show c)
+    r <- liftAff $ e.sync e.sockets.syncSocket (show c)
     pure $ convertWasmType (parseResult r)
 
 -- Command conversions
@@ -84,10 +90,11 @@ void s = runAsyncCmd $ Void s
 
 -- Remote monad
 
-newtype Remote a = Remote (ReaderT Endpoint Effect a)
+newtype Remote a = Remote (ReaderT Endpoint Aff a)
 derive newtype instance bindRemote ∷ Bind Remote
 derive newtype instance monadRemote :: Monad Remote
 derive newtype instance applicativeRemote ∷ Applicative Remote
 derive newtype instance applyRemote :: Apply Remote
+derive newtype instance functorRemote :: Functor Remote
 derive newtype instance monadAskRemote :: MonadAsk Endpoint Remote
 derive newtype instance monadEffectRemote :: MonadEffect Remote

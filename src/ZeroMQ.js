@@ -2,58 +2,80 @@
 
 const zmq = require('zeromq');
 
-const onMessageReceived = function(message) {
-  console.log('Remote: ' + message);
-}
-
 /*
  * Effect Callbacks
  */
 
-const createZeroMqServer = function(port) {
-    console.log('Starting server on port ' + port + '...');
-    const socket = zmq.socket('req');
+const timeout = 1000;
 
-    socket.on('message', onMessageReceived);
-    socket.connect('tcp://localhost:' + port);
+const createZeroMqServer = function (asyncPort, syncPort) {
+  console.log('Starting server.\nAsync port: ' + asyncPort + ',\nSync port: ' + syncPort + '.');
 
-    process.on('SIGINT', function() {
-      socket.close();
-    });
+  const asyncSocket = zmq.socket('push');
+  const syncSocket = zmq.socket('req');
 
-    console.log("Server started!");
+  asyncSocket.connect('tcp://localhost:' + asyncPort)
+  syncSocket.connect('tcp://localhost:' + syncPort);
 
-    return socket;
+  process.on('SIGINT', function () {
+    asyncSocket.close();
+    syncSocket.close();
+  });
+
+  console.log("Server started!");
+
+  return { asyncSocket: asyncSocket, syncSocket: syncSocket };
 }
 
 /*
  * Pure Functions
  */
 
-function sendAsync(socket, message) {
-  return function() {
-    socket.send(message);
+function sendAsync(socket, request) {
+  return function () {
+    return new Promise(function (resolve, reject) {
+      console.log('Sending async request: ' + request);
+      const rejectTimer = setTimeout(function () {
+        reject(new Error('request timed out.'));
+      }, timeout);
+
+      const clearTimer = function () {
+        clearTimeout(rejectTimer);
+      }
+
+      socket.send(request);
+      console.log('Async request sent');
+
+      // intentionally do not wait for response
+      // response is thrown away and ignored
+      clearTimer();
+      resolve();
+    });
   }
 }
 
-function sendSync(socket, message) {
-  return function() {
-    return new Promise(function(resolve, reject) {
-      const rejectTimer = setTimeout(function() {
+function sendSync(socket, request) {
+  return function () {
+    return new Promise(function (resolve, reject) {
+      console.log('Sending sync request: ' + request);
+      const rejectTimer = setTimeout(function () {
         reject(new Error('request timed out.'));
-      }, this.timeout);
-  
-      const clearTimer = function() {
+      }, timeout);
+
+      const clearTimer = function () {
         clearTimeout(rejectTimer);
-      } 
-  
-      this.socket.once('message', function(message) {
+      }
+
+      socket.once('message', function (message) {
         clearTimer();
-        resolve(message);
+        const deserialised = message.toString();
+        console.log('From sync: ' + deserialised);
+        resolve(deserialised);
       });
-  
-      this.socket.send(message);
-    }).then(function(res) {
+
+      socket.send(request);
+      console.log('Sync request sent');
+    }).then(function (res) {
       return res;
     });
   }

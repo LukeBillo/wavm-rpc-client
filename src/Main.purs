@@ -3,21 +3,28 @@ module Main where
 import ZeroMQ
 
 import Effect (Effect)
-import Prelude (bind, Unit, discard, ($))
+import Effect.Aff (Fiber, launchAff)
+import Effect.Class (liftEffect)
+import Effect.Class.Console (log)
+import Node.Process (exit)
+import Prelude (Unit, bind, discard, ($))
 
-createEndpoint :: Socket -> Endpoint
+createEndpoint :: ServerSockets -> Endpoint
 createEndpoint s = Endpoint {
-  socket: s,
+  sockets: s,
   async: sendRemoteAsync,
   sync: sendRemoteSync
 }
 
-main :: Effect Unit
-main = do
+main :: Effect (Fiber Unit)
+main = launchAff do
     send endpoint (do
-      init "module.wasm"
+      init "/home/luke/Documents/c++-wasm-files/wasm/basic-functions.wasm"
       r <- execute "foo"
       void "bar")
-  where endpoint = createEndpoint $ createRpcServer 45555
+    liftEffect $ do
+      log "WAVM commands successfully ran!"
+      exit 0   
+  where endpoint = createEndpoint $ createRpcServer 45555 45554
   
     
