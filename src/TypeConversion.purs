@@ -12,13 +12,15 @@ foreign import data JsPrimitive :: Type
 foreign import convertWasmType :: WasmType -> JsPrimitive
 
 data WasmType = 
+    STR String |
     I32 Int |
     F32 Number |
     ErrorType
 
 convertType ::  Maybe String -> Maybe String -> WasmType
-convertType (Just "i32") (Just r) = I32 $ fromMaybe 0 (I.fromString r)
-convertType (Just "f32") (Just r) = F32 $ fromMaybe 0.0 (N.fromString r)
+convertType (Just "str")       (Just r) = STR r
+convertType (Just "i32.const") (Just r) = I32 $ fromMaybe 0 (I.fromString r)
+convertType (Just "f32.const") (Just r) = F32 $ fromMaybe 0.0 (N.fromString r)
 convertType _            _        = ErrorType
 
 parseResult :: String -> WasmType

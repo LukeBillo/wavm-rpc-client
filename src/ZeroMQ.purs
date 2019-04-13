@@ -10,6 +10,7 @@ import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
+import Type.Data.Boolean (kind Boolean)
 import TypeConversion (JsPrimitive, convertWasmType, parseResult)
 
 -- Handling foreign imports
@@ -79,8 +80,8 @@ runSyncCmd c = Remote $ do
 
 -- Command conversions
 
-init :: String -> Remote Unit
-init s = runAsyncCmd $ Init s
+init :: String -> Boolean -> Remote JsPrimitive
+init s b = runSyncCmd $ Init s b
 
 execute :: String -> Remote JsPrimitive
 execute s = runSyncCmd $ Execute s

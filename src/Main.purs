@@ -19,8 +19,10 @@ createEndpoint s = Endpoint {
 main :: Effect (Fiber Unit)
 main = launchAff do
     send endpoint (do
-      init "/home/luke/Documents/c++-wasm-files/wasm/basic-functions.wasm"
-      r <- execute "foo"
+      _ <- init "/home/luke/Documents/c++-wasm-files/wasm/basic-functions-2.wasm" false
+      _ <- execute "_getMyNumber"
+      _ <- execute "potatoes"
+      _ <- execute "_addNumbers"
       void "bar")
     liftEffect $ do
       log "WAVM commands successfully ran!"
