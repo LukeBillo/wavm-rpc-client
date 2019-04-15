@@ -2,14 +2,18 @@ module ZeroMQ where
 
 import Prelude
 
-import Command (Command(..))
+import Command (Command(..), Bundle(..), Procedure(..), Commands)
 import Control.Monad.Reader (class MonadAsk, ReaderT, ask, runReaderT)
+import Control.Monad.State (StateT, get, put, runStateT)
 import Control.Promise (Promise, toAff)
+import Data.Array (null)
 import Data.Function.Uncurried (Fn2, runFn2)
+import Data.Tuple (fst, snd)
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
+import Effect.Console (log)
 import Type.Data.Boolean (kind Boolean)
 import TypeConversion (JsPrimitive, convertFromWasmType, parseResult)
 
@@ -52,9 +56,17 @@ sendSyncCurried = runFn2 sendSync
 sendRemoteSync :: SyncSocket -> String ->  Aff String
 sendRemoteSync sock s = liftEffect (sendSyncCurried sock s) >>= toAff
 
+sendBundledCmds :: Endpoint -> Commands -> Aff Unit
+sendBundledCmds (Endpoint e) cmds = e.async e.sockets.asyncSocket (show cmds)
+
 -- Generic
 send :: forall a. Endpoint -> Remote a -> Aff a
-send e (Remote r) = runReaderT r e
+send e (Remote r) = do
+    t <- runStateT (runReaderT r e) []
+    let res = fst t
+    let cmds = snd t
+    when (not (null cmds)) (sendBundledCmds e cmds)
+    pure res
 
 {- --------------- -}
 {- Command runners -}
@@ -67,15 +79,19 @@ data Endpoint = Endpoint {
 }
 
 runAsyncCmd :: Command -> Remote Unit
-runAsyncCmd c = Remote $ do 
-    (Endpoint e) <- ask
-    liftAff $ e.async e.sockets.asyncSocket (show c)
-    pure unit
+runAsyncCmd c = Remote $ do
+    liftEffect $ log (show c)
+    cmds <- get
+    liftEffect $ log (show cmds)
+    put (append [c] cmds)
 
-runSyncCmd :: Command -> Remote JsPrimitive
-runSyncCmd c = Remote $ do
+runSyncCmd :: Procedure -> Remote JsPrimitive
+runSyncCmd p = Remote $ do
+    liftEffect $ log (show p)
     (Endpoint e) <- ask
-    r <- liftAff $ e.sync e.sockets.syncSocket (show c)
+    cs <- get
+    r <- liftAff $ e.sync e.sockets.syncSocket (show (Bundle cs p))
+    put []
     pure $ convertFromWasmType (parseResult r)
 
 -- Command conversions
@@ -86,12 +102,12 @@ init s b = runSyncCmd $ Init s b
 execute :: String -> Remote JsPrimitive
 execute s = runSyncCmd $ Execute s
 
-void :: String -> Remote Unit
-void s = runAsyncCmd $ Void s
+executeAsync :: String -> Remote Unit
+executeAsync s = runAsyncCmd $ ExecuteAsync s
 
 -- Remote monad
 
-newtype Remote a = Remote (ReaderT Endpoint Aff a)
+newtype Remote a = Remote (ReaderT Endpoint (StateT (Array Command) Aff) a)
 derive newtype instance bindRemote ∷ Bind Remote
 derive newtype instance monadRemote :: Monad Remote
 derive newtype instance applicativeRemote ∷ Applicative Remote

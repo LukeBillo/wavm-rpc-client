@@ -1,13 +1,12 @@
 module Main where
 
-import ZeroMQ
-
 import Effect (Effect)
 import Effect.Aff (Fiber, launchAff)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
 import Node.Process (exit)
 import Prelude (Unit, bind, discard, pure, unit, ($))
+import ZeroMQ (Endpoint(..), ServerSockets, createRpcServer, execute, executeAsync, init, send, sendRemoteAsync, sendRemoteSync)
 
 createEndpoint :: ServerSockets -> Endpoint
 createEndpoint s = Endpoint {
@@ -19,10 +18,7 @@ createEndpoint s = Endpoint {
 main :: Effect (Fiber Unit)
 main = launchAff do
     send endpoint (do
-      _ <- init "/home/luke/Documents/c++-wasm-files/wasm/struct-test.wasm" false
-      _ <- execute "_getMyNumber"
-      _ <- execute "_addToMyNumber 5"
-      _ <- execute "_getMyNumber"
+      _ <- init "/home/luke/Documents/c++-wasm-files/wasm/a.compiled.wasm" true
       pure unit
     )
     liftEffect $ do
