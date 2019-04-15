@@ -1,7 +1,7 @@
 "use strict"
 
-function convertWasmType(wasmType) {
+function convertFromWasmType(wasmType) {
     return wasmType.value0;
 }
 
-exports.convertWasmType = convertWasmType;
+exports.convertFromWasmType = convertFromWasmType;

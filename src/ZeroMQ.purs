@@ -11,7 +11,7 @@ import Effect.Aff (Aff)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
 import Type.Data.Boolean (kind Boolean)
-import TypeConversion (JsPrimitive, convertWasmType, parseResult)
+import TypeConversion (JsPrimitive, convertFromWasmType, parseResult)
 
 -- Handling foreign imports
 
@@ -76,7 +76,7 @@ runSyncCmd :: Command -> Remote JsPrimitive
 runSyncCmd c = Remote $ do
     (Endpoint e) <- ask
     r <- liftAff $ e.sync e.sockets.syncSocket (show c)
-    pure $ convertWasmType (parseResult r)
+    pure $ convertFromWasmType (parseResult r)
 
 -- Command conversions
 

@@ -7,7 +7,7 @@ import Effect.Aff (Fiber, launchAff)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
 import Node.Process (exit)
-import Prelude (Unit, bind, discard, ($))
+import Prelude (Unit, bind, discard, pure, unit, ($))
 
 createEndpoint :: ServerSockets -> Endpoint
 createEndpoint s = Endpoint {
@@ -19,11 +19,12 @@ createEndpoint s = Endpoint {
 main :: Effect (Fiber Unit)
 main = launchAff do
     send endpoint (do
-      _ <- init "/home/luke/Documents/c++-wasm-files/wasm/basic-functions-2.wasm" false
+      _ <- init "/home/luke/Documents/c++-wasm-files/wasm/struct-test.wasm" false
       _ <- execute "_getMyNumber"
-      _ <- execute "potatoes"
-      _ <- execute "_addNumbers"
-      void "bar")
+      _ <- execute "_addToMyNumber 5"
+      _ <- execute "_getMyNumber"
+      pure unit
+    )
     liftEffect $ do
       log "WAVM commands successfully ran!"
       exit 0   

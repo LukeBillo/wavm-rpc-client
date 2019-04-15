@@ -9,7 +9,7 @@ import Prelude (($))
 
 foreign import data JsPrimitive :: Type
 
-foreign import convertWasmType :: WasmType -> JsPrimitive
+foreign import convertFromWasmType :: WasmType -> JsPrimitive
 
 data WasmType = 
     STR String |
@@ -17,11 +17,11 @@ data WasmType =
     F32 Number |
     ErrorType
 
-convertType ::  Maybe String -> Maybe String -> WasmType
-convertType (Just "str")       (Just r) = STR r
-convertType (Just "i32.const") (Just r) = I32 $ fromMaybe 0 (I.fromString r)
-convertType (Just "f32.const") (Just r) = F32 $ fromMaybe 0.0 (N.fromString r)
-convertType _            _        = ErrorType
+convertToWasmType ::  Maybe String -> Maybe String -> WasmType
+convertToWasmType (Just "str")       (Just r) = STR r
+convertToWasmType (Just "i32.const") (Just r) = I32 $ fromMaybe 0 (I.fromString r)
+convertToWasmType (Just "f32.const") (Just r) = F32 $ fromMaybe 0.0 (N.fromString r)
+convertToWasmType _            _        = ErrorType
 
 parseResult :: String -> WasmType
 parseResult s =
@@ -30,4 +30,4 @@ parseResult s =
         resultType = head splits
         resultValue = last splits
     in
-        convertType resultType resultValue
+        convertToWasmType resultType resultValue
