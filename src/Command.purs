@@ -6,13 +6,13 @@ import Type.Data.Boolean (kind Boolean)
 -- Serializables
 
 data Command = 
-    ExecuteAsync String |
+    Void String |
     InvalidCmd
 
 type Commands = Array Command
 
 instance showCommand :: Show Command where
-  show (ExecuteAsync function) = "ExecuteAsync \"" <> function <> "\""
+  show (Void function) = "Void \"" <> function <> "\""
   show (InvalidCmd) = "Invalid command"
 
 data Procedure = Init String Boolean |

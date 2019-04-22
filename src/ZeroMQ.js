@@ -34,7 +34,6 @@ const createZeroMqServer = function (asyncPort, syncPort) {
 function sendAsync(socket, request) {
   return function () {
     return new Promise(function (resolve, reject) {
-      console.log('Sending async request: ' + request);
       const rejectTimer = setTimeout(function () {
         reject(new Error('request timed out.'));
       }, timeout);
@@ -44,7 +43,6 @@ function sendAsync(socket, request) {
       }
 
       socket.send(request);
-      console.log('Async request sent');
 
       // intentionally do not wait for response
       // response is thrown away and ignored
@@ -57,7 +55,6 @@ function sendAsync(socket, request) {
 function sendSync(socket, request) {
   return function () {
     return new Promise(function (resolve, reject) {
-      console.log('Sending sync request: ' + request);
       const rejectTimer = setTimeout(function () {
         reject(new Error('request timed out.'));
       }, timeout);
@@ -69,12 +66,10 @@ function sendSync(socket, request) {
       socket.once('message', function (message) {
         clearTimer();
         const deserialised = message.toString();
-        console.log('From sync: ' + deserialised);
         resolve(deserialised);
       });
 
       socket.send(request);
-      console.log('Sync request sent');
     }).then(function (res) {
       return res;
     });

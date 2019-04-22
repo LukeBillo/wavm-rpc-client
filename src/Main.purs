@@ -1,29 +1,21 @@
 module Main where
 
+import Prelude
+
+import Control.Promise (Promise, fromAff)
 import Effect (Effect)
-import Effect.Aff (Fiber, launchAff)
 import Effect.Class (liftEffect)
-import Effect.Class.Console (log)
-import Node.Process (exit)
-import Prelude (Unit, bind, discard, pure, unit, ($))
-import ZeroMQ (Endpoint(..), ServerSockets, createRpcServer, execute, executeAsync, init, send, sendRemoteAsync, sendRemoteSync)
+import Effect.Console (log)
+import TypeConversion (JsPrimitive)
+import ZeroMQ (Endpoint, createEndpoint, createRpcServer, execute, send, void, init)
 
-createEndpoint :: ServerSockets -> Endpoint
-createEndpoint s = Endpoint {
-  sockets: s,
-  async: sendRemoteAsync,
-  sync: sendRemoteSync
-}
-
-main :: Effect (Fiber Unit)
-main = launchAff do
-    send endpoint (do
-      _ <- init "/home/luke/Documents/c++-wasm-files/wasm/a.compiled.wasm" true
-      pure unit
-    )
-    liftEffect $ do
-      log "WAVM commands successfully ran!"
-      exit 0   
-  where endpoint = createEndpoint $ createRpcServer 45555 45554
+main :: Effect (Promise Unit)
+main = initP endpoint
+        where endpoint = createEndpoint $ createRpcServer 45555 45554
   
-    
+initP ::Endpoint -> Effect (Promise Unit)
+initP endpoint = fromAff $ send endpoint (do 
+        _ <- init "/home/luke/Documents/c++-wasm-files/wasm/basic-functions-precomp.wasm" true
+        void "addToMyNumber 15"
+        void "addToMyNumber 15"
+)

@@ -13,7 +13,6 @@ import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
-import Effect.Console (log)
 import Type.Data.Boolean (kind Boolean)
 import TypeConversion (JsPrimitive, convertFromWasmType, parseResult)
 
@@ -78,16 +77,20 @@ data Endpoint = Endpoint {
     sync :: SyncSocket -> String -> Aff String
 }
 
+createEndpoint :: ServerSockets -> Endpoint
+createEndpoint s = Endpoint {
+  sockets: s,
+  async: sendRemoteAsync,
+  sync: sendRemoteSync
+}
+
 runAsyncCmd :: Command -> Remote Unit
 runAsyncCmd c = Remote $ do
-    liftEffect $ log (show c)
     cmds <- get
-    liftEffect $ log (show cmds)
     put (append [c] cmds)
 
 runSyncCmd :: Procedure -> Remote JsPrimitive
 runSyncCmd p = Remote $ do
-    liftEffect $ log (show p)
     (Endpoint e) <- ask
     cs <- get
     r <- liftAff $ e.sync e.sockets.syncSocket (show (Bundle cs p))
@@ -102,8 +105,8 @@ init s b = runSyncCmd $ Init s b
 execute :: String -> Remote JsPrimitive
 execute s = runSyncCmd $ Execute s
 
-executeAsync :: String -> Remote Unit
-executeAsync s = runAsyncCmd $ ExecuteAsync s
+void :: String -> Remote Unit
+void s = runAsyncCmd $ Void s
 
 -- Remote monad
 
